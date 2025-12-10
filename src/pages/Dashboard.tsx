@@ -4,44 +4,42 @@ import { ResultsPanel } from '../components/ResultsPanel';
 
 type DashboardStatus = 'idle' | 'analyzing' | 'solutions_found' | 'no_match';
 
-const MOCK_SOLUTIONS = [
-    {
-        id: '1',
-        title: 'Restart Nginx Service',
-        matchScore: 92,
-        description: 'The error logs indicate a Worker process crash which is often resolved by a clean restart.',
-    },
-    {
-        id: '2',
-        title: 'Clear Redis Cache',
-        matchScore: 85,
-        description: 'High latency and timeout errors may suggest cache fragmentation.',
-    },
-];
-
 export function Dashboard() {
     const [query, setQuery] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [status, setStatus] = useState<DashboardStatus>('idle');
+    const [solutions, setSolutions] = useState<any[]>([]);
 
-    const handleAnalyze = () => {
+    const handleAnalyze = async () => {
         if (!query.trim()) return;
 
         setIsAnalyzing(true);
         setStatus('analyzing');
+        setSolutions([]);
 
-        // Simulate API delay
-        setTimeout(() => {
-            setIsAnalyzing(false);
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query }),
+            });
 
-            // Simple logic for demo: if query contains "unknown" or "error", show no match
-            // Otherwise show a mock match
-            if (query.toLowerCase().includes('unknown')) {
-                setStatus('no_match');
-            } else {
+            if (!response.ok) throw new Error('Analysis failed');
+
+            const data = await response.json();
+
+            if (data.matches && data.matches.length > 0) {
+                setSolutions(data.matches);
                 setStatus('solutions_found');
+            } else {
+                setStatus('no_match');
             }
-        }, 2000);
+        } catch (error) {
+            console.error('Analysis error:', error);
+            setStatus('no_match'); // Fallback to manual for now
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     return (
@@ -55,7 +53,7 @@ export function Dashboard() {
             <div className="bg-gray-900/50 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                 <ResultsPanel
                     status={status}
-                    solutions={status === 'solutions_found' ? MOCK_SOLUTIONS : []}
+                    solutions={solutions}
                 />
             </div>
         </div>
